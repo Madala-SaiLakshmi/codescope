@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     secret_key: str
     cors_origins: str = "http://localhost:5173"
     environment: str = "development"
+    workspace_dir: str = "workspaces"
+    clone_timeout_seconds: int = 120
+    max_repo_mb: int = 200
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
