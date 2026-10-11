@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../services/api'
 import type { Repository } from '../types/repository'
@@ -93,7 +94,9 @@ export default function Repositories() {
           <ul className="grid gap-3">
             {repos.map((r) => (
               <li key={r.id} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-                <div className="font-medium">{r.name}</div>
+                <Link to={`/repositories/${r.id}`} className="font-medium text-indigo-300 hover:underline">
+                  {r.name}
+                </Link>
                 <div className="text-sm text-slate-400">{r.source_url}</div>
                 <div className="text-xs text-slate-500">
                   {r.default_branch} · {new Date(r.created_at).toLocaleString()}
