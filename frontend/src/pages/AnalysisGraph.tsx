@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import DependencyGraph from '../components/DependencyGraph'
+import DependencyGraph, { EDGE_COLOR } from '../components/DependencyGraph'
 import { api } from '../services/api'
 import type { Analysis, DependencyResult, GraphData } from '../types/analysis'
+
+const KINDS = ['extends', 'implements', 'calls', 'instantiates']
+
+function isTestNode(id: string, path: string | null): boolean {
+  const p = (path ?? '').toLowerCase()
+  return p.includes('/test/') || p.startsWith('test/') || /tests?\b/i.test(id.split('.').slice(-2)[0] ?? '') || /Tests?(\.|$)/.test(id)
+}
 
 export default function AnalysisGraph() {
   const { id } = useParams()
   const jobId = Number(id)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [level, setLevel] = useState<'symbol' | 'type'>('type')
-  const [data, setData] = useState<GraphData | null>(null)
+  const [raw, setRaw] = useState<GraphData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -17,6 +24,9 @@ export default function AnalysisGraph() {
   const [deps, setDeps] = useState<DependencyResult | null>(null)
   const [dependents, setDependents] = useState<DependencyResult | null>(null)
   const [transitive, setTransitive] = useState(false)
+  const [hideTests, setHideTests] = useState(true)
+  const [hideUncertain, setHideUncertain] = useState(false)
+  const [kinds, setKinds] = useState<Set<string>>(new Set(KINDS))
 
   useEffect(() => {
     api.getAnalysis(jobId).then(setAnalysis).catch((e) => setError((e as Error).message))
@@ -28,12 +38,30 @@ export default function AnalysisGraph() {
     api
       .getGraph(jobId, level)
       .then((d) => {
-        setData(d)
+        setRaw(d)
         setError(null)
       })
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
   }, [jobId, level])
+
+  // Apply filters on the client; the backend data is unchanged.
+  const data: GraphData | null = useMemo(() => {
+    if (!raw) return null
+    const keep = new Set(
+      raw.nodes.filter((n) => !(hideTests && isTestNode(n.id, n.path))).map((n) => n.id),
+    )
+    const edges = raw.edges
+      .map((e) => ({ ...e, kinds: e.kinds.filter((k) => kinds.has(k)) }))
+      .filter(
+        (e) =>
+          e.kinds.length > 0 &&
+          keep.has(e.source) &&
+          keep.has(e.target) &&
+          !(hideUncertain && e.status !== 'resolved'),
+      )
+    return { ...raw, nodes: raw.nodes.filter((n) => keep.has(n.id)), edges }
+  }, [raw, hideTests, hideUncertain, kinds])
 
   useEffect(() => {
     if (!selectedId) {
@@ -66,6 +94,15 @@ export default function AnalysisGraph() {
 
   const selected = data?.nodes.find((n) => n.id === selectedId) ?? null
 
+  function toggleKind(k: string) {
+    setKinds((prev) => {
+      const next = new Set(prev)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return next
+    })
+  }
+
   return (
     <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
       <header className="flex flex-wrap items-center gap-3 border-b border-slate-800 p-3">
@@ -79,7 +116,7 @@ export default function AnalysisGraph() {
         {analysis?.revision && (
           <span className="text-xs text-slate-400">{analysis.revision.slice(0, 7)}</span>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <input
             aria-label="Search symbols"
             placeholder="Search..."
@@ -100,6 +137,34 @@ export default function AnalysisGraph() {
         </div>
       </header>
 
+      <div className="flex flex-wrap items-center gap-4 border-b border-slate-800 px-3 py-2 text-xs text-slate-300">
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={hideTests} onChange={(e) => setHideTests(e.target.checked)} />
+          Hide test classes
+        </label>
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={hideUncertain}
+            onChange={(e) => setHideUncertain(e.target.checked)}
+          />
+          Hide uncertain (dashed) links
+        </label>
+        <span className="text-slate-500">|</span>
+        {KINDS.map((k) => (
+          <label key={k} className="flex items-center gap-1">
+            <input type="checkbox" checked={kinds.has(k)} onChange={() => toggleKind(k)} />
+            <span className="inline-block h-0.5 w-4" style={{ background: EDGE_COLOR[k] }} />
+            {k}
+          </label>
+        ))}
+        {data && (
+          <span className="ml-auto text-slate-500">
+            {data.nodes.length} nodes · {data.edges.length} links
+          </span>
+        )}
+      </div>
+
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <main className="relative min-h-[50vh] flex-1">
           {loading && <p className="p-4 text-slate-400">Loading graph...</p>}
@@ -109,7 +174,7 @@ export default function AnalysisGraph() {
             </div>
           )}
           {!loading && data && data.nodes.length === 0 && (
-            <p className="p-4 text-slate-400">This analysis found no symbols.</p>
+            <p className="p-4 text-slate-400">Nothing to show with the current filters.</p>
           )}
           {!loading && data && data.nodes.length > 0 && (
             <DependencyGraph
@@ -123,9 +188,18 @@ export default function AnalysisGraph() {
 
         <aside className="w-full overflow-y-auto border-t border-slate-800 p-4 md:w-96 md:border-l md:border-t-0">
           {!selected ? (
-            <p className="text-sm text-slate-400">
-              Click a node to see its details. Arrows point from a symbol to what it depends on.
-            </p>
+            <div className="grid gap-2 text-sm text-slate-400">
+              <p>
+                Click a node to focus on it. An arrow A → B means A depends on B.
+              </p>
+              <p>
+                <span className="text-orange-400">Orange</span> = depends on the selected node
+                (could break if it changes).
+                <br />
+                <span className="text-cyan-300">Cyan</span> = what the selected node depends on.
+              </p>
+              <p>Dashed lines are uncertain (for example overloaded methods).</p>
+            </div>
           ) : (
             <div className="grid gap-3 text-sm">
               <div>
@@ -144,13 +218,18 @@ export default function AnalysisGraph() {
                 />
                 Include indirect (transitive)
               </label>
-              <RelatedList title="Depends on" items={deps?.items} onPick={setSelectedId} />
               <RelatedList
-                title="Used by (what a change here can affect)"
+                title="Depends on"
+                color="text-cyan-300"
+                items={deps?.items}
+                onPick={setSelectedId}
+              />
+              <RelatedList
+                title="Used by (a change here can affect these)"
+                color="text-orange-400"
                 items={dependents?.items}
                 onPick={setSelectedId}
-                level={level}
-                nodeIds={data?.nodes.map((n) => n.id)}
+                nodeIds={raw?.nodes.map((n) => n.id)}
               />
             </div>
           )}
@@ -162,15 +241,15 @@ export default function AnalysisGraph() {
 
 function RelatedList(props: {
   title: string
+  color: string
   items?: string[]
   onPick: (id: string) => void
-  level?: 'symbol' | 'type'
   nodeIds?: string[]
 }) {
   const known = props.nodeIds ? new Set(props.nodeIds) : null
   return (
     <div>
-      <h2 className="mb-1 font-medium">
+      <h2 className={`mb-1 font-medium ${props.color}`}>
         {props.title} {props.items ? `(${props.items.length})` : ''}
       </h2>
       {!props.items ? (
@@ -183,7 +262,7 @@ function RelatedList(props: {
             <li key={it}>
               <button
                 onClick={() => props.onPick(it)}
-                className="break-all text-left text-indigo-300 hover:underline"
+                className="break-all text-left text-slate-200 hover:underline"
               >
                 {it}
               </button>
