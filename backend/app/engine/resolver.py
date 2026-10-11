@@ -14,12 +14,12 @@ MAX_AMBIGUOUS = 10
 
 @dataclass(frozen=True)
 class Edge:
-    source: str            # qualified name of the dependent (A in A -> B)
-    target: str | None     # qualified name of the dependency; None if unknown
+    source: str
+    target: str | None
     kind: str              # extends | implements | calls | instantiates
     status: str
     line: int
-    name: str              # text as written in the source
+    name: str
 
 
 class SymbolIndex:
@@ -42,6 +42,14 @@ class Resolver:
         self.files = files
         self.index = SymbolIndex(files)
         self._supers: dict[str, list[str]] = defaultdict(list)
+        self._vars: dict[str, dict[str, tuple[str, ParsedFile] | None]] = defaultdict(dict)
+        for f in files:
+            for v in f.variables:
+                scope = self._vars[v.scope]
+                if v.name in scope and (scope[v.name] is None or scope[v.name][0] != v.type_name):
+                    scope[v.name] = None
+                else:
+                    scope[v.name] = (v.type_name, f)
 
     def resolve(self) -> list[Edge]:
         edges: list[Edge] = []
@@ -54,7 +62,6 @@ class Resolver:
                     seen.add(e)
                     edges.append(e)
 
-        # Pass 1: inheritance. Must finish first: method lookup walks supertypes.
         for f in self.files:
             for rel in f.relations:
                 status, targets = self._resolve_type(rel.target, f, rel.source)
@@ -62,7 +69,6 @@ class Resolver:
                     self._supers[rel.source].append(targets[0])
                 add(rel.source, status, targets, rel.kind, rel.line, rel.target)
 
-        # Pass 2: calls and instantiations.
         for f in self.files:
             for ref in f.references:
                 if ref.caller is None:
@@ -75,10 +81,7 @@ class Resolver:
                     add(ref.caller, status, targets, "calls", ref.line, ref.name)
         return edges
 
-    # ---- types ----------------------------------------------------------
-
     def _type_chain(self, context: str | None) -> list[str]:
-        """Enclosing types, innermost first."""
         chain, cur, seen = [], context, set()
         while cur and cur not in seen:
             seen.add(cur)
@@ -97,7 +100,7 @@ class Resolver:
         head, _, rest = name.partition(".")
         base = None
 
-        for outer in self._type_chain(context):          # 1. nested / enclosing
+        for outer in self._type_chain(context):
             if idx.symbols[outer].name == head:
                 base = outer
                 break
@@ -105,7 +108,7 @@ class Resolver:
                 base = f"{outer}.{head}"
                 break
 
-        if base is None:                                  # 2. explicit import
+        if base is None:
             for imp in f.imports:
                 if imp.is_static or imp.is_wildcard:
                     continue
@@ -115,12 +118,12 @@ class Resolver:
                         break
                     return EXTERNAL, []
 
-        if base is None:                                  # 3. same package
+        if base is None:
             cand = f"{f.package}.{head}" if f.package else head
             if idx.is_type(cand):
                 base = cand
 
-        if base is None:                                  # 4. wildcard imports
+        if base is None:
             cands = []
             for imp in f.imports:
                 if imp.is_wildcard and not imp.is_static:
@@ -139,10 +142,23 @@ class Resolver:
             return (RESOLVED, [full]) if idx.is_type(full) else (UNRESOLVED, [])
         return RESOLVED, [base]
 
-    # ---- calls ----------------------------------------------------------
+    def _variable_type(self, name: str, caller: str, chain: list[str]):
+        local = self._vars.get(caller, {})
+        if name in local:
+            return True, local[name]
+        seen, queue = set(), list(chain)
+        while queue:
+            t = queue.pop(0)
+            if t in seen:
+                continue
+            seen.add(t)
+            fields = self._vars.get(t, {})
+            if name in fields:
+                return True, fields[name]
+            queue.extend(self._supers.get(t, []))
+        return False, None
 
     def _find_methods(self, type_qn: str, name: str) -> list[str]:
-        """Nearest declaring type wins (BFS up the supertypes)."""
         seen, queue = set(), [type_qn]
         while queue:
             t = queue.pop(0)
@@ -184,7 +200,17 @@ class Resolver:
                     return self._classify(found)
             return UNRESOLVED, []
 
-        # Only a receiver that looks like a class name (SpringApplication.run).
+        if recv.isidentifier():
+            found_var, decl = self._variable_type(recv, ref.caller, chain)
+            if found_var:
+                if decl is None:
+                    return UNRESOLVED, []
+                type_name, decl_file = decl
+                status, targets = self._resolve_type(type_name, decl_file, ref.caller)
+                if status == RESOLVED:
+                    return self._classify(self._find_methods(targets[0], ref.name))
+                return (EXTERNAL, []) if status == EXTERNAL else (UNRESOLVED, [])
+
         if recv[0].isupper() and recv.replace(".", "").isidentifier():
             status, targets = self._resolve_type(recv, f, ref.caller)
             if status == RESOLVED:
@@ -192,4 +218,4 @@ class Resolver:
             if status == EXTERNAL:
                 return EXTERNAL, []
 
-        return UNRESOLVED, []  # receiver is a variable or expression: type unknown
+        return UNRESOLVED, []

@@ -35,6 +35,13 @@ class ReferenceInfo:
     line: int
     caller: str | None    # qualified name of the enclosing method/type
 
+@dataclass(frozen=True)
+class VariableInfo:
+    scope: str   # qualified name of the method (local/param) or type (field)
+    name: str
+    type_name: str  # type as written, generics and [] stripped
+    kind: str    # "field" | "local"
+    line: int
 
 @dataclass
 class ParsedFile:
@@ -44,6 +51,7 @@ class ParsedFile:
     symbols: list[SymbolInfo] = field(default_factory=list)
     relations: list[TypeRelation] = field(default_factory=list)
     references: list[ReferenceInfo] = field(default_factory=list)
+    variables: list[VariableInfo] = field(default_factory=list)
     has_syntax_errors: bool = False
     error_lines: list[int] = field(default_factory=list)
 

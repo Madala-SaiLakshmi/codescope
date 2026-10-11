@@ -11,6 +11,8 @@ def scan_java_files(
     root: Path, max_files: int = 5000, max_file_bytes: int = 1_000_000
 ) -> ScanResult:
     root = root.resolve()
+    if not root.is_dir():
+        raise FileNotFoundError(f"Not a directory: {root}")
     parser = JavaParser()
     result = ScanResult()
 

@@ -7,6 +7,7 @@ from app.parser.models import (
     ReferenceInfo,
     SymbolInfo,
     TypeRelation,
+    VariableInfo,
 )
 
 _TYPE_KINDS = {
@@ -35,6 +36,10 @@ def _line(node: Node) -> int:
 def _clean_type(text: str) -> str:
     """'Comparable<Greeter>' -> 'Comparable'."""
     return "".join(text.split()).split("<")[0]
+
+
+def _clean_var_type(text: str) -> str:
+    return _clean_type(text).replace("[]", "").replace("...", "")
 
 
 class JavaParser:
@@ -94,6 +99,19 @@ class JavaParser:
             self._add_invocation(node, scope, result)
         elif node.type == "object_creation_expression":
             self._add_instantiation(node, scope, result)
+        elif node.type == "field_declaration" or node.type == "local_variable_declaration":
+            names = [
+                _text(c.child_by_field_name("name"))
+                for c in node.children
+                if c.type == "variable_declarator"
+            ]
+            self._add_vars(node.child_by_field_name("type"), names, scope, result, _line(node))
+        elif node.type == "formal_parameter" or node.type == "enhanced_for_statement":
+            self._add_vars(
+                node.child_by_field_name("type"),
+                [_text(node.child_by_field_name("name"))],
+                scope, result, _line(node),
+            )
 
         for child in node.children:
             self._walk(child, scope, result)
@@ -161,6 +179,22 @@ class JavaParser:
                     )
                     types.append("".join(_text(t).split()) + "...")
         return ",".join(types)
+
+    # ---- variables -----------------------------------------------------
+
+    def _add_vars(self, type_node, names, scope, result, line) -> None:
+        if not scope or type_node is None:
+            return
+        type_name = _clean_var_type(_text(type_node))
+        if not type_name or type_name == "var":
+            return  # inferred types are not guessed
+        owner = scope[-1]
+        kind = "field" if owner.kind in _TYPE_KIND_NAMES else "local"
+        for n in names:
+            if n:
+                result.variables.append(
+                    VariableInfo(owner.qualified_name, n, type_name, kind, line)
+                )
 
     # ---- relations, references, errors ---------------------------------
 
