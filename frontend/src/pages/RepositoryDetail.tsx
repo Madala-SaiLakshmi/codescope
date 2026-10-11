@@ -63,13 +63,21 @@ export default function RepositoryDetail() {
             <h1 className="mt-4 text-2xl font-semibold">{repo?.name ?? 'Repository'}</h1>
             <p className="mb-6 text-sm text-slate-400">{repo?.source_url}</p>
 
-            <button
-              onClick={analyze}
-              disabled={running || !repo}
-              className="mb-6 rounded bg-indigo-600 px-4 py-2 font-medium disabled:opacity-50"
-            >
-              {running ? 'Analyzing... (this can take a minute)' : 'Analyze repository'}
-            </button>
+            <div className="mb-6 flex flex-wrap gap-3">
+              <button
+                onClick={analyze}
+                disabled={running || !repo}
+                className="rounded bg-indigo-600 px-4 py-2 font-medium disabled:opacity-50"
+              >
+                {running ? 'Analyzing... (this can take a minute)' : 'Analyze repository'}
+              </button>
+              <Link
+                to={`/repositories/${repoId}/compare`}
+                className="inline-block rounded border border-slate-700 px-4 py-2 font-medium text-slate-200 hover:bg-slate-800"
+              >
+                Compare revisions
+              </Link>
+            </div>
 
             {error && (
               <div role="alert" className="mb-4 rounded border border-red-800 bg-red-950 p-3 text-sm text-red-200">

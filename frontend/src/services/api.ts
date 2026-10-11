@@ -1,7 +1,7 @@
 import type { Repository, RepositoryCreate } from '../types/repository'
 import type { Analysis, DependencyResult, GraphData } from '../types/analysis'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...init,
