@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -34,6 +34,10 @@ class ImpactReport(Base):
     affected_count: Mapped[int] = mapped_column(Integer, default=0)
     uncertainty_count: Mapped[int] = mapped_column(Integer, default=0)
     uncertainties: Mapped[list] = mapped_column(JSON, default=list)
+    import_changes: Mapped[list] = mapped_column(JSON, default=list, server_default='[]')
+    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    risk_factors: Mapped[list] = mapped_column(JSON, default=list, server_default='[]')
 
 
 class GitChange(Base):
@@ -64,3 +68,17 @@ class ImpactItem(Base):
     certain: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     root: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     via: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+
+class SelectedTest(Base):
+    __tablename__ = "selected_tests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("impact_reports.id", ondelete="CASCADE"), index=True
+    )
+    test_path: Mapped[str] = mapped_column(String(1000))
+    test_class: Mapped[str] = mapped_column(String(1000))
+    score: Mapped[float] = mapped_column(Float)
+    confidence: Mapped[str] = mapped_column(String(10))  # high | medium | low
+    reasons: Mapped[list] = mapped_column(JSON, default=list)
