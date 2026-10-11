@@ -50,4 +50,24 @@ export interface ImpactReportDetail extends ImpactReport {
   changed: ChangedSymbol[]
   affected: AffectedSymbol[]
   uncertainties: Uncertainty[]
+  risk_score: number | null
+  risk_level: 'low' | 'medium' | 'high' | 'critical' | null
+  risk_factors: RiskFactor[]
+  import_changes: Uncertainty[]
+  tests: SelectedTest[]
+}
+
+export interface RiskFactor {
+  name: string
+  points: number
+  max_points: number
+  detail: string
+}
+
+export interface SelectedTest {
+  test_path: string
+  test_class: string
+  score: number
+  confidence: 'high' | 'medium' | 'low'
+  reasons: string[]
 }

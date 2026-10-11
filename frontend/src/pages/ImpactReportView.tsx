@@ -1,3 +1,5 @@
+import RiskCard from '../components/RiskCard'
+import TestList from '../components/TestList'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { impactApi } from '../services/impactApi'
@@ -61,6 +63,14 @@ export default function ImpactReportView() {
               ))}
             </div>
 
+            <Section title="Risk score">
+              <RiskCard score={report.risk_score} level={report.risk_level} factors={report.risk_factors} />
+            </Section>
+
+            <Section title={`Suggested tests (${report.tests.length})`}>
+              <TestList tests={report.tests} />
+            </Section>
+
             <Section title={`Changed files (${report.files.length})`}>
               {report.files.map((f) => (
                 <li key={f.path} className="break-all">
@@ -106,6 +116,14 @@ export default function ImpactReportView() {
                 </li>
               ))}
             </Section>
+
+              {report.import_changes.length > 0 && (
+              <Section title={`Import-only edits (${report.import_changes.length}, not traced)`}>
+                {report.import_changes.map((u, i) => (
+                  <li key={i} className="break-all text-xs text-slate-400">{u.path}: {u.message}</li>
+                ))}
+              </Section>
+            )}
 
             <p className="mt-6 text-xs text-slate-500">
               Results are based on static analysis. Calls on variables whose type is unknown are
