@@ -97,5 +97,5 @@ def test_affected_symbols_and_paths(repo, tmp_path):
 
 def test_unmapped_import_change_is_reported(repo, tmp_path):
     _, result = analyze(repo, tmp_path)
-    assert any(u.path == "app/a/A.java" and "outside any class or method" in u.message
-               for u in result.uncertainties)
+    assert any(u.path == "app/a/A.java" for u in result.import_changes)
+    assert not any(u.path == "app/a/A.java" for u in result.uncertainties)

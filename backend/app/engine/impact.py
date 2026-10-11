@@ -39,6 +39,7 @@ class ImpactResult:
     changed: list[ChangedSymbol] = field(default_factory=list)
     affected: list[AffectedSymbol] = field(default_factory=list)
     uncertainties: list[Uncertainty] = field(default_factory=list)
+    import_changes: list[Uncertainty] = field(default_factory=list)  # import-only edits, informational
 
 
 def _map_ranges(symbols: list[SymbolInfo], ranges):
@@ -178,9 +179,14 @@ def compute_impact(
         syms, unmapped = _map_ranges(tf.symbols, ch.new_ranges)
         for s in syms:
             changed[s.qualified_name] = ChangedSymbol(s.qualified_name, s.kind, tf.path, "modified")
+        import_lines = {i.line for i in tf.imports}
         for a, b in unmapped:
+            if all(n in import_lines for n in range(a, b + 1)):
+                result.import_changes.append(Uncertainty(
+                    ch.path, f"Import lines {a}-{b} changed (not traced; usually low impact)"))
+                continue
             note(ch.path, f"Changed lines {a}-{b} are outside any class or method "
-                          "(imports, package or comments); impact cannot be traced")
+                          "(package declaration or comments); impact cannot be traced")
 
         if ch.old_ranges:
             if base_files is None:
