@@ -114,3 +114,22 @@ class DependencyGraph:
             else:
                 out._g.add_edge(ou, ov, kinds=set(a["kinds"]), status=a["status"])
         return out
+    @classmethod
+    def from_records(cls, nodes: list[dict], edges: list[Edge]) -> "DependencyGraph":
+        """Rebuild a graph from saved rows (used by the API)."""
+        graph = cls()
+        for n in nodes:
+            graph._g.add_node(
+                n["qualified_name"], kind=n["kind"], name=n["name"], parent=n["parent"],
+                path=n["path"], start_line=n["start_line"], end_line=n["end_line"],
+            )
+        for e in edges:
+            graph._add_edge(e)
+        return graph
+
+    def node_data(self, node: str) -> dict:
+        self._require(node)
+        return dict(self._g.nodes[node])
+
+    def edge_list(self) -> list[tuple[str, str, list[str], str]]:
+        return [(u, v, sorted(a["kinds"]), a["status"]) for u, v, a in self._g.edges(data=True)]
