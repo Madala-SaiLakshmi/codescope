@@ -211,3 +211,9 @@ def compute_impact(
                             key=lambda c: (c.change, c.qualified_name))
     result.affected = sorted(affected.values(), key=lambda a: (a.distance, a.qualified_name))
     return result
+
+
+def direct_dependent_counts(graph: DependencyGraph, names: list[str]) -> dict[str, int]:
+    """Number of direct dependents of each symbol (used as a centrality measure)."""
+    nodes = set(graph.nodes())
+    return {n: len(graph.dependents(n)) for n in names if n in nodes}

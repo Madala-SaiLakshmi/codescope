@@ -38,6 +38,8 @@ class TestCandidate:
     test_class: str
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
+    evidence: list[tuple[str, float]] = field(default_factory=list)  # (kind, points)
+    confidence: str = "low"  # high = graph evidence, medium = name match, low = same package only
 
 
 def select_tests(result: ImpactResult, test_files: dict[str, list[str]]) -> list[TestCandidate]:
@@ -69,7 +71,7 @@ def select_tests(result: ImpactResult, test_files: dict[str, list[str]]) -> list
             continue
         c = cand(path, cls)
         points = max(10.0, 60.0 - 15.0 * (a.distance - 1)) * (1.0 if a.certain else 0.6)
-        c.score += points
+        c.evidence.append(("graph", points))
         kind = "confirmed" if a.certain else "uncertain"
         c.reasons.append(
             f"{a.qualified_name.split('.')[-1]} reaches changed code {a.distance} step(s) away "
@@ -89,7 +91,7 @@ def select_tests(result: ImpactResult, test_files: dict[str, list[str]]) -> list
                 core = core[4:] if core.startswith("Test") else core
             if core and core in changed_names:
                 c = cand(path, t)
-                c.score += 30.0
+                c.evidence.append(("name", 30.0))
                 c.reasons.append(f"name matches changed class {core}")
 
     # 3. Same package as changed production code.
@@ -97,12 +99,15 @@ def select_tests(result: ImpactResult, test_files: dict[str, list[str]]) -> list
         mirrored = package_of(path).replace("src/test/java", "src/main/java")
         if mirrored in changed_dirs:
             c = cand(path, next(iter(test_files[path]), path))
-            c.score += 10.0
+            c.evidence.append(("package", 10.0))
             c.reasons.append("in the same package as changed code")
 
     out = list(candidates.values())
     for c in out:
-        c.score = min(100.0, round(c.score, 1))
+        pts = sorted((p for _, p in c.evidence), reverse=True)
+        c.score = min(100.0, round(pts[0] + 0.1 * sum(pts[1:]), 1)) if pts else 0.0
+        kinds = {k for k, _ in c.evidence}
+        c.confidence = "high" if "graph" in kinds else "medium" if "name" in kinds else "low"
     return sorted(out, key=lambda c: (-c.score, c.path))
 
 
