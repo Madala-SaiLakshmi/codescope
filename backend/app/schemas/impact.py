@@ -62,3 +62,26 @@ class ImpactReportDetail(ImpactReportRead):
     changed: list[ChangedSymbolRead]
     affected: list[AffectedSymbolRead]
     uncertainties: list[UncertaintyRead]
+
+
+class SelectedTestRead(BaseModel):
+    test_path: str
+    test_class: str
+    score: float
+    confidence: str
+    reasons: list[str]
+
+
+class RiskFactorRead(BaseModel):
+    name: str
+    points: float
+    max_points: float
+    detail: str
+
+
+class ImpactReportFull(ImpactReportDetail):
+    risk_score: float | None = None
+    risk_level: str | None = None
+    risk_factors: list[RiskFactorRead] = []
+    import_changes: list[UncertaintyRead] = []
+    tests: list[SelectedTestRead] = []

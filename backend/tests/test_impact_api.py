@@ -90,3 +90,13 @@ def test_bad_revisions_fail_safely(client, base, message):
 def test_not_found(client):
     assert client.post("/api/repositories/999/impact-reports", json={"base": "HEAD~1"}).status_code == 404
     assert client.get("/api/impact-reports/999").status_code == 404
+
+
+def test_report_includes_risk_and_tests(client):
+    repo_id = register(client)
+    r = client.post(f"/api/repositories/{repo_id}/impact-reports", json={"base": "HEAD~1"}).json()
+    d = client.get(f"/api/impact-reports/{r['id']}").json()
+    assert d["risk_score"] is not None and d["risk_level"] in {"low", "medium", "high", "critical"}
+    assert len(d["risk_factors"]) == 6
+    assert abs(d["risk_score"] - sum(f["points"] for f in d["risk_factors"])) < 0.2
+    assert d["tests"] == []  # the sample repo has no test files

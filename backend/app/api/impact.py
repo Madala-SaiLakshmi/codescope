@@ -3,14 +3,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.impact import GitChange, ImpactItem, ImpactReport
+from app.models.impact import GitChange, ImpactItem, ImpactReport, SelectedTest
 from app.models.repository import Repository
 from app.schemas.impact import (
     AffectedSymbolRead,
     ChangedSymbolRead,
     FileChangeRead,
     ImpactCreate,
-    ImpactReportDetail,
+    ImpactReportFull,
+    SelectedTestRead,
+    RiskFactorRead,
     ImpactReportRead,
     UncertaintyRead,
 )
@@ -42,7 +44,7 @@ def list_impact_reports(repository_id: int, db: Session = Depends(get_db)):
     return list(db.scalars(stmt))
 
 
-@router.get("/impact-reports/{report_id}", response_model=ImpactReportDetail)
+@router.get("/impact-reports/{report_id}", response_model=ImpactReportFull)
 def get_impact_report(report_id: int, db: Session = Depends(get_db)):
     report = db.get(ImpactReport, report_id)
     if report is None:
@@ -60,11 +62,20 @@ def get_impact_report(report_id: int, db: Session = Depends(get_db)):
                     root=i.root or "", via=list(i.via or []))
                 for i in items if i.item_type == "affected"]
     base = ImpactReportRead.model_validate(report).model_dump()
-    return ImpactReportDetail(
+    tests = db.scalars(select(SelectedTest).where(SelectedTest.report_id == report_id)
+                       .order_by(SelectedTest.score.desc(), SelectedTest.id)).all()
+    return ImpactReportFull(
         **base,
         files=[FileChangeRead(path=f.path, old_path=f.old_path, change_type=f.change_type)
                for f in files],
         changed=changed,
         affected=affected,
-        uncertainties=[UncertaintyRead(**u) for u in (report.uncertainties or [])],
+        uncertainties=[UncertaintyRead(**x) for x in (report.uncertainties or [])],
+        risk_score=report.risk_score,
+        risk_level=report.risk_level,
+        risk_factors=[RiskFactorRead(**x) for x in (report.risk_factors or [])],
+        import_changes=[UncertaintyRead(**x) for x in (report.import_changes or [])],
+        tests=[SelectedTestRead(test_path=t.test_path, test_class=t.test_class, score=t.score,
+                                confidence=t.confidence, reasons=list(t.reasons or []))
+               for t in tests],
     )

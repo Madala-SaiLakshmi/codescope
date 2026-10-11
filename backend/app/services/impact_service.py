@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.engine.graph import DependencyGraph
-from app.engine.impact import compute_impact
+from app.engine.impact import compute_impact, direct_dependent_counts
+from app.engine.tests_select import compute_risk, is_test_path, select_tests
 from app.engine.resolver import Resolver
 from app.models.analysis import AnalysisJob
-from app.models.impact import GitChange, ImpactItem, ImpactReport
+from app.models.impact import GitChange, ImpactItem, ImpactReport, SelectedTest
 from app.models.repository import Repository
 from app.parser.scanner import scan_java_files
 from app.services.analysis_service import AnalysisService
@@ -75,7 +76,8 @@ class ImpactService:
             changes = get_changes(clone, base_sha, target_sha)
             result = compute_impact(
                 changes, target_scan.files, target_graph, base_scan.files, base_graph)
-            return self._save(report, base_sha, target_sha, base_job, target_job, result)
+            return self._save(report, base_sha, target_sha, base_job, target_job,
+                              result, target_scan, target_graph)
         except (GitError, ValueError) as e:
             return self._fail(report_id, str(e), job_ids)
         except Exception:
@@ -96,7 +98,8 @@ class ImpactService:
         svc._persist(job, root, scan, edges, sha)  # one transaction per snapshot
         return job, scan, DependencyGraph.build(scan.files, edges)
 
-    def _save(self, report, base_sha, target_sha, base_job, target_job, result) -> ImpactReport:
+    def _save(self, report, base_sha, target_sha, base_job, target_job, result,
+              target_scan, target_graph) -> ImpactReport:
         for ch in result.changes:
             self.db.add(GitChange(report_id=report.id, path=ch.path[:1000],
                                   old_path=ch.old_path, change_type=ch.change_type))
@@ -109,6 +112,24 @@ class ImpactService:
                 report_id=report.id, item_type="affected", qualified_name=a.qualified_name,
                 kind=a.kind, path=a.path, distance=a.distance, certain=a.certain,
                 root=a.root, via=list(a.via)))
+        test_files = {
+            f.path: [x.qualified_name for x in f.symbols if x.kind in ("class", "interface", "enum", "record")]
+            for f in target_scan.files if is_test_path(f.path)
+        }
+        selected = select_tests(result, test_files)
+        for t in selected:
+            self.db.add(SelectedTest(
+                report_id=report.id, test_path=t.path[:1000], test_class=t.test_class[:1000],
+                score=t.score, confidence=t.confidence, reasons=list(t.reasons)))
+        centrality = direct_dependent_counts(
+            target_graph, [c.qualified_name for c in result.changed])
+        risk = compute_risk(result, selected, target_graph.node_count(), centrality)
+        report.risk_score = risk.total
+        report.risk_level = risk.level
+        report.risk_factors = [
+            {"name": f.name, "points": f.points, "max_points": f.max_points, "detail": f.detail}
+            for f in risk.factors]
+        report.import_changes = [{"path": u.path, "message": u.message} for u in result.import_changes]
         report.base_sha, report.target_sha = base_sha, target_sha
         report.base_job_id, report.target_job_id = base_job.id, target_job.id
         report.uncertainties = [{"path": u.path, "message": u.message} for u in result.uncertainties]
