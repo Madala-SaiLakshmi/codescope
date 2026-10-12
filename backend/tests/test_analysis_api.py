@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.database import get_db
 from app.main import app
+from tests.auth_helpers import login
 from app.services.git_service import GitError
 from tests.sample_repo import write_sample
 
@@ -20,7 +21,9 @@ def client(db, monkeypatch):
 
     app.dependency_overrides[get_db] = override
     monkeypatch.setattr("app.services.analysis_service.clone_repository", fake_clone)
-    yield TestClient(app)
+    c = TestClient(app)
+    login(c)
+    yield c
     app.dependency_overrides.clear()
 
 

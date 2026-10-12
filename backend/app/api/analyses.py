@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user, owned_job, owned_repository
 from app.database import get_db
 from app.engine.graph import DependencyGraph
 from app.models.analysis import AnalysisJob
-from app.models.repository import Repository
+from app.models.user import User
 from app.schemas.analysis import (
     AnalysisRead,
     DependencyRead,
@@ -19,33 +20,26 @@ from app.services.graph_query_service import GraphQueryService
 router = APIRouter(prefix="/api", tags=["analyses"])
 
 
-def _job_or_404(db: Session, job_id: int) -> AnalysisJob:
-    job = db.get(AnalysisJob, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    return job
-
-
-def _loaded_graph(db: Session, job_id: int) -> DependencyGraph:
-    job = _job_or_404(db, job_id)
+def _loaded_graph(db: Session, user: User, job_id: int) -> DependencyGraph:
+    job = owned_job(db, user, job_id)
     if job.status != "succeeded":
         raise HTTPException(status_code=409, detail=f"Analysis is {job.status}")
     return GraphQueryService(db).load(job_id)
 
 
 @router.post("/repositories/{repository_id}/analyses", response_model=AnalysisRead, status_code=201)
-def start_analysis(repository_id: int, db: Session = Depends(get_db)):
-    if db.get(Repository, repository_id) is None:
-        raise HTTPException(status_code=404, detail="Repository not found")
+def start_analysis(repository_id: int, db: Session = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    owned_repository(db, user, repository_id)
     service = AnalysisService(db)
     job = service.create_job(repository_id)
-    return service.run(job.id)  # runs inside the request for now; becomes a background job later
+    return service.run(job.id)  # inline for now; becomes a background job later
 
 
 @router.get("/repositories/{repository_id}/analyses", response_model=list[AnalysisRead])
-def list_analyses(repository_id: int, db: Session = Depends(get_db)):
-    if db.get(Repository, repository_id) is None:
-        raise HTTPException(status_code=404, detail="Repository not found")
+def list_analyses(repository_id: int, db: Session = Depends(get_db),
+                  user: User = Depends(get_current_user)):
+    owned_repository(db, user, repository_id)
     stmt = (
         select(AnalysisJob)
         .where(AnalysisJob.repository_id == repository_id)
@@ -55,8 +49,9 @@ def list_analyses(repository_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/analyses/{job_id}", response_model=AnalysisRead)
-def get_analysis(job_id: int, db: Session = Depends(get_db)):
-    return _job_or_404(db, job_id)
+def get_analysis(job_id: int, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    return owned_job(db, user, job_id)
 
 
 @router.get("/analyses/{job_id}/graph", response_model=GraphRead)
@@ -65,8 +60,9 @@ def get_graph(
     level: str = Query("symbol", pattern="^(symbol|type)$"),
     include_uncertain: bool = True,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    graph = _loaded_graph(db, job_id)
+    graph = _loaded_graph(db, user, job_id)
     if level == "type":
         graph = graph.collapse_to_types()
     nodes = []
@@ -84,8 +80,8 @@ def get_graph(
     return GraphRead(job_id=job_id, level=level, nodes=nodes, edges=edges)
 
 
-def _related(db, job_id, symbol, transitive, include_uncertain, relation) -> DependencyRead:
-    graph = _loaded_graph(db, job_id)
+def _related(db, user, job_id, symbol, transitive, include_uncertain, relation) -> DependencyRead:
+    graph = _loaded_graph(db, user, job_id)
     if symbol not in graph.nodes():
         raise HTTPException(status_code=404, detail="Symbol not found in this analysis")
     if relation == "dependencies":
@@ -102,13 +98,15 @@ def _related(db, job_id, symbol, transitive, include_uncertain, relation) -> Dep
 def dependencies(
     job_id: int, symbol: str = Query(...), transitive: bool = False,
     include_uncertain: bool = True, db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    return _related(db, job_id, symbol, transitive, include_uncertain, "dependencies")
+    return _related(db, user, job_id, symbol, transitive, include_uncertain, "dependencies")
 
 
 @router.get("/analyses/{job_id}/dependents", response_model=DependencyRead)
 def dependents(
     job_id: int, symbol: str = Query(...), transitive: bool = False,
     include_uncertain: bool = True, db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    return _related(db, job_id, symbol, transitive, include_uncertain, "dependents")
+    return _related(db, user, job_id, symbol, transitive, include_uncertain, "dependents")

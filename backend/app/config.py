@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     workspace_dir: str = "workspaces"
     clone_timeout_seconds: int = 120
     max_repo_mb: int = 200
+    access_token_minutes: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

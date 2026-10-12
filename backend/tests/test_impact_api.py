@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.database import get_db
 from app.main import app
+from tests.auth_helpers import login
 
 FILES_1 = {
     "app/a/A.java": "package app.a;\nimport app.b.B;\npublic class A {\n  void run() { B.help(); }\n}\n",
@@ -43,7 +44,9 @@ def client(db, monkeypatch):
 
     app.dependency_overrides[get_db] = override
     monkeypatch.setattr("app.services.impact_service.clone_repository", fake_clone)
-    yield TestClient(app)
+    c = TestClient(app)
+    login(c)
+    yield c
     app.dependency_overrides.clear()
 
 
