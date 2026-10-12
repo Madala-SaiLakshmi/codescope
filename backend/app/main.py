@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import analyses, auth, health, impact, repositories
 from app.config import get_settings
+from app.middleware import BodySizeLimitMiddleware
 
 settings = get_settings()
 
@@ -15,6 +16,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.include_router(health.router)
 app.include_router(auth.router)

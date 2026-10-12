@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, owned_report, owned_repository
+from app import ratelimit
 from app.database import get_db
 from app.models.impact import GitChange, ImpactItem, ImpactReport, SelectedTest
 from app.models.user import User
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/api", tags=["impact"])
 def create_impact_report(repository_id: int, payload: ImpactCreate,
                          db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     owned_repository(db, user, repository_id)
+    ratelimit.heavy_limiter.check(f"user:{user.id}")
     service = ImpactService(db)
     report = service.create_report(repository_id, payload.base, payload.target)
     return service.run(report.id)  # inline for now; becomes a background job later

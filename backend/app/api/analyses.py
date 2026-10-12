@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, owned_job, owned_repository
+from app import ratelimit
 from app.database import get_db
 from app.engine.graph import DependencyGraph
 from app.models.analysis import AnalysisJob
@@ -31,6 +32,7 @@ def _loaded_graph(db: Session, user: User, job_id: int) -> DependencyGraph:
 def start_analysis(repository_id: int, db: Session = Depends(get_db),
                    user: User = Depends(get_current_user)):
     owned_repository(db, user, repository_id)
+    ratelimit.heavy_limiter.check(f"user:{user.id}")
     service = AnalysisService(db)
     job = service.create_job(repository_id)
     return service.run(job.id)  # inline for now; becomes a background job later

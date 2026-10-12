@@ -8,6 +8,15 @@ from app.config import get_settings
 from app.database import Base
 
 
+@pytest.fixture(autouse=True)
+def _reset_limiters():
+    from app import ratelimit
+    for lim in (ratelimit.login_ip_limiter, ratelimit.login_email_limiter,
+                ratelimit.register_limiter, ratelimit.heavy_limiter):
+        lim.reset()
+    yield
+
+
 @pytest.fixture
 def db():
     """A session on a separate database, created empty for every test."""

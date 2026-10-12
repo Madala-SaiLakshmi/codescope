@@ -20,7 +20,7 @@ from app.engine.tests_select import is_test_path, select_tests  # noqa: E402
 from app.parser.scanner import scan_java_files  # noqa: E402
 from app.services.git_diff import export_revision, get_changes  # noqa: E402
 
-SRC = Path("/tmp/pc_full")
+SRC = Path.home() / "petclinic_full"
 WORK = Path("/tmp/pc_eval")
 CS_TMP = Path("/tmp/pc_eval_cs")
 P = "src/main/java/org/springframework/samples/petclinic/"
