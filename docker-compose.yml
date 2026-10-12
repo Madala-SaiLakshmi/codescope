@@ -15,5 +15,23 @@ services:
       interval: 5s
       retries: 10
 
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://codescope:codescope@db:5432/codescope
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in your shell or a .env file next to this compose file}
+      CORS_ORIGINS: http://localhost:8080
+      ENVIRONMENT: production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
