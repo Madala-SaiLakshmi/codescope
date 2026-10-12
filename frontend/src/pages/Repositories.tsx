@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState, type FormEvent } from 'react'
-import { api } from '../services/api'
+import { api, authApi } from '../services/api'
 import type { Repository } from '../types/repository'
 
 export default function Repositories() {
@@ -45,6 +45,11 @@ export default function Repositories() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="mx-auto max-w-3xl">
+        <button
+          onClick={() => { authApi.logout(); window.location.assign('/login') }}
+          className="float-right text-sm text-slate-400 hover:underline">
+          Sign out
+        </button>
         <h1 className="text-2xl font-semibold">CodeScope</h1>
         <p className="text-slate-400 mb-6">Repositories</p>
 

@@ -1,11 +1,21 @@
+import { clearToken, getToken, setToken } from './auth'
 import type { Repository, RepositoryCreate } from '../types/repository'
 import type { Analysis, DependencyResult, GraphData } from '../types/analysis'
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken()
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   })
+  if (res.status === 401 && !path.startsWith('/api/auth/login')) {
+    clearToken()
+    window.location.assign('/login')
+    throw new Error('Session expired, please sign in again')
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     const detail = body?.detail
@@ -50,4 +60,20 @@ export const api = {
     request<DependencyResult>(
       `/api/analyses/${id}/${relation}?symbol=${encodeURIComponent(symbol)}&transitive=${transitive}`,
     ),
+}
+
+export const authApi = {
+  register: (email: string, password: string) =>
+    request<{ id: number; email: string }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  login: async (email: string, password: string) => {
+    const res = await request<{ access_token: string }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    setToken(res.access_token)
+  },
+  logout: () => clearToken(),
 }
