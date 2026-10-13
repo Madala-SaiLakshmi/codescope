@@ -1,6 +1,11 @@
-from app.engine.graph import DependencyGraph
-from app.engine.impact import AffectedSymbol, ChangedSymbol, ImpactResult, direct_dependent_counts
 from app.engine.changes import FileChange
+from app.engine.graph import DependencyGraph
+from app.engine.impact import (
+    AffectedSymbol,
+    ChangedSymbol,
+    ImpactResult,
+    direct_dependent_counts,
+)
 from app.engine.resolver import Resolver
 from app.engine.tests_select import select_tests
 from app.parser.java_parser import JavaParser

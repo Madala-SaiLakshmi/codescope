@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.engine.graph import DependencyGraph
 from app.engine.impact import compute_impact, direct_dependent_counts
-from app.engine.tests_select import compute_risk, is_test_path, select_tests
 from app.engine.resolver import Resolver
+from app.engine.tests_select import compute_risk, is_test_path, select_tests
 from app.models.analysis import AnalysisJob
 from app.models.impact import GitChange, ImpactItem, ImpactReport, SelectedTest
 from app.models.repository import Repository
@@ -27,7 +27,7 @@ HISTORY_DEPTH = 200
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ImpactService:

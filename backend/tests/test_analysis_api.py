@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 
 from app.database import get_db
 from app.main import app
-from tests.auth_helpers import login
 from app.services.git_service import GitError
+from tests.auth_helpers import login
 from tests.sample_repo import write_sample
 
 HELP = "app.b.B.help()"

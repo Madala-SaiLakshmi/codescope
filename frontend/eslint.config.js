@@ -18,5 +18,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Data-loading effects here set state when a request starts and finishes.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])

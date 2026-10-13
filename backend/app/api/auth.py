@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import ratelimit
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserRead
-from fastapi import Request
-from app import ratelimit
 from app.security import create_token, fake_verify, hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])

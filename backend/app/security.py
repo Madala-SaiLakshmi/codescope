@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from argon2 import PasswordHasher
@@ -30,7 +30,7 @@ def fake_verify() -> None:
 def create_token(user_id: int, minutes: int | None = None) -> str:
     settings = get_settings()
     lifetime = settings.access_token_minutes if minutes is None else minutes
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=lifetime)}
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 

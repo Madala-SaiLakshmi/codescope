@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from app.engine.impact import AffectedSymbol, ChangedSymbol, ImpactResult
+from app.engine.impact import AffectedSymbol, ImpactResult
 
 TEST_SUFFIXES = ("Test", "Tests", "IT", "TestCase")
 
@@ -88,17 +88,17 @@ def select_tests(result: ImpactResult, test_files: dict[str, list[str]]) -> list
                     core = core[: -len(suf)]
                     break
             else:
-                core = core[4:] if core.startswith("Test") else core
+                core = core.removeprefix("Test")
             if core and core in changed_names:
                 c = cand(path, t)
                 c.evidence.append(("name", 30.0))
                 c.reasons.append(f"name matches changed class {core}")
 
     # 3. Same package as changed production code.
-    for path in test_files:
+    for path, types in test_files.items():
         mirrored = package_of(path).replace("src/test/java", "src/main/java")
         if mirrored in changed_dirs:
-            c = cand(path, next(iter(test_files[path]), path))
+            c = cand(path, next(iter(types), path))
             c.evidence.append(("package", 10.0))
             c.reasons.append("in the same package as changed code")
 

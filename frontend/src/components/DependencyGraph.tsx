@@ -14,6 +14,7 @@ import type { GraphData } from '../types/analysis'
 const NODE_W = 220
 const NODE_H = 40
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const KIND_COLOR: Record<string, string> = {
   class: '#6366f1',
   interface: '#14b8a6',
@@ -23,6 +24,7 @@ export const KIND_COLOR: Record<string, string> = {
   constructor: '#64748b',
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const EDGE_COLOR: Record<string, string> = {
   extends: '#a78bfa',
   implements: '#2dd4bf',

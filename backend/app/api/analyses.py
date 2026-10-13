@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, owned_job, owned_repository
 from app import ratelimit
+from app.api.deps import get_current_user, owned_job, owned_repository
 from app.database import get_db
 from app.engine.graph import DependencyGraph
 from app.models.analysis import AnalysisJob
