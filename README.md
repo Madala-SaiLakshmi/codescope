@@ -1,6 +1,6 @@
 # CodeScope
 
-![CI](https://github.com)
+![CI](![CI](https://github.com/Madala-SaiLakshmi/codescope/actions/workflows/ci.yml/badge.svg))
 
 **Intelligent codebase analysis and change-impact engine.** Point it at a Java repository and it parses the source with Tree-sitter, builds a dependency graph, and, given two Git revisions, tells you which classes and methods a change can affect, which tests to run first, and how risky the change is, with the evidence for each answer.
 
