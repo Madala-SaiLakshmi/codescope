@@ -1,5 +1,7 @@
 # CodeScope
 
+![CI](https://github.com)
+
 **Intelligent codebase analysis and change-impact engine.** Point it at a Java repository and it parses the source with Tree-sitter, builds a dependency graph, and, given two Git revisions, tells you which classes and methods a change can affect, which tests to run first, and how risky the change is, with the evidence for each answer.
 
 ## What it does
@@ -48,7 +50,7 @@ Each analysis stores its own snapshot, so a failed run never overwrites the last
 Requirements: Python 3.11+, Node 20+, Git, Docker.
 
 ```bash
-git clone <your-repo-url> codescope && cd codescope
+git clone https://github.com codescope && cd codescope
 
 # database
 docker compose up -d db
